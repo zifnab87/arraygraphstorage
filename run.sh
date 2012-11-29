@@ -5,7 +5,8 @@ fi
 echo Loading tuples representation into a flat array
 iquery -q 'create array adjFlat <vertex1:int64, vertex2:int64, isAdjacent:int64> [i=0:*,100000,0];'
 csv2scidb -p NNN -s 1 < input-tuples-sparse.csv > input.scidb
-iquery -q "load adjFlat from '/home/scidb/input.scidb'"
+IMPORT_FILEPATH="$(pwd)/input.scidb"
+iquery -q "load adjFlat from '$IMPORT_FILEPATH'"
 rm input.scidb
 echo Converting into adjacency matrix
 iquery -q "create array adj <isAdjacent:int64> [vertex1=0:4,1000,0, vertex2=0:4,1000,0]"
