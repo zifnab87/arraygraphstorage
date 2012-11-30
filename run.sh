@@ -20,7 +20,7 @@ iquery -nq "drop array y;" &>/dev/null
 iquery -nq "drop array r;" &>/dev/null
 iquery -nq "drop array rs;" &>/dev/null
 
-
+CHNK=5 #chunk size
 # loading tuples representation into a flat array
 AQL "create array T <i:int64, j:int64, val:int64> [d=0:*,100000,0];"
 csv2scidb -p NNN -s 1 < input-tuples-sparse.csv > input.scidb
@@ -30,7 +30,7 @@ rm input.scidb
 
 
 # converting into adjacency matrix
-AQL "create array A <val:int64> [i=0:4,1000,0, j=0:4,1000,0]"
+AQL "create array A <val:int64> [i=0:4,$CHNK,0, j=0:4,$CHNK,0]"
 AFL "redimension_store(T,A);"
 
 
@@ -50,9 +50,9 @@ AQL "update A set val=1 where i=j"
 
 
 echo "Performing BFS (startNode = $1, numSteps = $2)"
-AQL "create array x <val:int64> [i=0:0,1000,0, j=0:4,1000,0]"
-AQL "create array y <val:int64> [i=0:0,1000,0, j=0:4,1000,0]"
-AQL "create array r <val:int64> [i=0:0,1000,0, j=0:4,1000,0]"
+AQL "create array x <val:int64> [i=0:0,$CHNK,0, j=0:4,$CHNK,0]"
+AQL "create array y <val:int64> [i=0:0,$CHNK,0, j=0:4,$CHNK,0]"
+AQL "create array r <val:int64> [i=0:0,$CHNK,0, j=0:4,$CHNK,0]"
 AFL "store(build(x,iif(j=$1,1,0)),x)"
 #AFL "store(subarray(A,$1,0,$1,4),x)"
 CHAIN_MULT_QUERY="x"
@@ -64,10 +64,10 @@ iquery -taq "store($CHAIN_MULT_QUERY,y)" | tail -n +2
 AQL "update y set val=1 where val>0"
 echo "Result:"
 
-# convert to list of node inexes representation
+# convert to list of node indexes representation
 AQL "insert into r select j from y where val=1"
 NRES=$(iquery -q "select count(val) from r")
 NRES=$(( ${NRES:2:1} - 1 ))
-AQL "create array rs <val:int64> [m=0:$NRES,1000,0]"
-AFL "store(subarray(project(unpack(r,m,1000),val),0,$NRES),rs)"
+AQL "create array rs <val:int64> [m=0:$NRES,$CHNK,0]"
+AFL "store(subarray(project(unpack(r,m,$CHNK),val),0,$NRES),rs)"
 iquery -o csv -aq "scan(rs)" | tail -n +2
