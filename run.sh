@@ -17,6 +17,8 @@ iquery -nq "drop array A;" &>/dev/null
 iquery -nq "drop array T;" &>/dev/null
 iquery -nq "drop array x;" &>/dev/null
 iquery -nq "drop array y;" &>/dev/null
+iquery -nq "drop array r;" &>/dev/null
+iquery -nq "drop array rs;" &>/dev/null
 
 
 echo Loading tuples representation into a flat array
@@ -50,6 +52,7 @@ AQL "update A set val=1 where i=j"
 echo Performing BFS
 AQL "create array x <val:int64> [i=0:0,1000,0, j=0:4,1000,0]"
 AQL "create array y <val:int64> [i=0:0,1000,0, j=0:4,1000,0]"
+AQL "create array r <val:int64> [i=0:0,1000,0, j=0:4,1000,0]"
 AFL "store(build(x,iif(j=$1,1,0)),x)"
 #AFL "store(subarray(A,$1,0,$1,4),x)"
 echo "x[0] = "
@@ -63,5 +66,11 @@ echo $CHAIN_QUERY
 iquery -taq "store($CHAIN_MULT_QUERY,y)"
 AQL "update y set val=1 where val>0"
 echo "y = A^$2 * x[0] = "
-iquery -aq "scan(y)"
 
+# convert to list of node inexes representation
+AQL "insert into r select j from y where val=1"
+NRES=$(iquery -q "select count(val) from r")
+NRES=$(( ${NRES:2:1} - 1 ))
+AQL "create array rs <val:int64> [m=0:$NRES,1000,0]"
+AFL "store(subarray(project(unpack(r,m,1000),val),0,$NRES),rs)"
+iquery -o csv -aq "scan(rs)" | tail -n +2
