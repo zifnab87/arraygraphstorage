@@ -60,7 +60,7 @@ do
 	CHAIN_MULT_QUERY="multiply($CHAIN_MULT_QUERY,A)"
 done 
 echo $CHAIN_QUERY
-AFL "store($CHAIN_MULT_QUERY,y)"
+iquery -taq "store($CHAIN_MULT_QUERY,y)"
 AQL "update y set val=1 where val>0"
 echo "y = A^$2 * x[0] = "
 iquery -aq "scan(y)"
