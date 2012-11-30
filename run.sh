@@ -1,9 +1,26 @@
 function AFL {
 	iquery -naq "$1" >/dev/null
+	if [ $? -ne 0 ]; then
+		cleanup
+		exit
+	fi
 }
 
 function AQL {
 	iquery -nq "$1" >/dev/null
+	if [ $? -ne 0 ]; then
+		cleanup
+		exit
+	fi
+}
+
+function cleanup {
+	iquery -nq "drop array A;" &>/dev/null
+	iquery -nq "drop array T;" &>/dev/null
+	iquery -nq "drop array x;" &>/dev/null
+	iquery -nq "drop array y;" &>/dev/null
+	iquery -nq "drop array r;" &>/dev/null
+	iquery -nq "drop array rs;" &>/dev/null
 }
 
 
@@ -12,13 +29,6 @@ if [ $# -ne 2 -o "$1" == "--help" ]; then
 	exit
 fi
 
-# clean up
-iquery -nq "drop array A;" &>/dev/null
-iquery -nq "drop array T;" &>/dev/null
-iquery -nq "drop array x;" &>/dev/null
-iquery -nq "drop array y;" &>/dev/null
-iquery -nq "drop array r;" &>/dev/null
-iquery -nq "drop array rs;" &>/dev/null
 
 CHNK=5 #chunk size
 # loading tuples representation into a flat array
@@ -71,3 +81,5 @@ NRES=$(( ${NRES:2:1} - 1 ))
 AQL "create array rs <val:int64> [m=0:$NRES,$CHNK,0]"
 AFL "store(subarray(project(unpack(r,m,$CHNK),val),0,$NRES),rs)"
 iquery -o csv -aq "scan(rs)" | tail -n +2
+
+cleanup
