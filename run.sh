@@ -42,6 +42,8 @@ rm input.scidb
 # converting into adjacency matrix
 AQL "create array A <val:int64> [i=0:4,$CHNK,0, j=0:4,$CHNK,0]"
 AFL "redimension_store(T,A);"
+# NOTE: although attribute 'val' is not nullable many of the
+# cells will still be empty...
 
 
 # filling out NULL cells with 0\'s
