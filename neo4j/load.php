@@ -15,10 +15,13 @@ function find_num_of_nodes($filename){
 	$max = 0;
 	$counter = 0;
 	while (!feof($file)){
-		$line=fgets($file);
+		$line = fgets($file);
+		$line = trim($line);
+		if (empty($line) || $line=="")
+			break;
 		list($node1,$node2,$relation) = explode(",",$line);
 		if ($counter==0){
-			echo $relation."<br/>";
+			//echo $relation."<br/>";
 			$counter++;
 		}
 		else if ($counter>0) {
@@ -38,6 +41,7 @@ function find_num_of_nodes($filename){
 		
 
 	}
+	echo $max;
 	fclose($file);
 	return $max;
 }
@@ -50,15 +54,27 @@ function add_relations($filename){
 
 	while (!feof($file)){
 		$line=fgets($file);
+		$line = trim($line);
+		//echo "~~~".$line."~~~";
+		if (empty($line) || $line=="")
+			break;
 		list($node1,$node2,$rel) = explode(",",$line);
 		if ($counter==0){
 			$relation=$rel;
 			$counter++;
 		}
 		else if ($counter>0) {
-			$node1 = get_node_by_title($node1);
-			$node2 = get_node_by_title($node2);
-			insert_relation($node1,$node2,$relation);
+			echo "~~".$node1."~~<br/>";
+			echo "~~".$node2."~~<br/>";
+			$node1 = get_node_by_title((string)$node1);
+			$node2 = get_node_by_title((string)$node2);
+			if ($node1==null || $node2==null){
+				break;
+			}
+			if ($node1!=null && $node2!=null){
+				echo $bika;
+				insert_relation($node1,$node2,$relation);
+			}
 		}
 
 	}
@@ -73,8 +89,7 @@ $filename = "input-tuples-sparse.csv";
 $max = find_num_of_nodes($filename);
 
 for ($i=0;$i<=$max;$i++){
-	insert_node($i);
-	echo "bika";
+	$node=insert_node((string)$i);
 }
 add_relations($filename);
 

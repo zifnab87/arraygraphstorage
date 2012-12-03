@@ -9,10 +9,13 @@ function get_node_by_id($id) { //NEO4J
 function get_node_by_title($title) {
 	global $db;
 	$nodeIndex = new Everyman\Neo4j\Index\NodeIndex($db, 'node');
+
 	$node=$nodeIndex->findOne("title",$title);
 	if (!$node) {
         return null;
     }
+	//echo $node->getProperty("title");
+	//echo $node->getId()."\n\n";
 	return $node;
 }
 
@@ -20,13 +23,12 @@ function get_node_by_title($title) {
 
 function insert_node($input) {
 	global $db;
-	if (!empty($input)) {
-		$node = $db->makeNode();
-		$node->setProperty("title",$input);
-		$node->save();
-		index_node($node);
-	}
-	return $neo4jnode;
+	$node = $db->makeNode();
+	$node->setProperty("title",(string)$input);
+	$node->save();
+	index_node($node);
+	
+	return $node;
 }
 
 function insert_relation($node1,$node2,$relation_type) {
