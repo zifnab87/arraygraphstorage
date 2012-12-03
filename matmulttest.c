@@ -244,13 +244,14 @@ elem_t** mat_sparse_to_dense(sparse_elem_t** S, int n)
 }
 
 
-elem_t** mat_sparse_mult_transposed(sparse_elem_t** A, sparse_elem_t** B, int n)
+sparse_elem_t** mat_sparse_mult_transposed(sparse_elem_t** A, sparse_elem_t** B, int n)
 {
 	int i,j,sum;
-	sparse_elem_t *pac,*pbc;
+	sparse_elem_t *pac,*pbc, *pcj;
 	assert(A != NULL && B != NULL && n > 0);
-	elem_t** C = mat_new(n);
+	sparse_elem_t** C = mat_sparse_new(n);
 	for (i = 0; i < n; i++) {
+        pcj = C[i];
 		for (j = 0; j<n; j++) {
 			sum = 0;
 			pac = A[i]->nxt;
@@ -272,17 +273,24 @@ elem_t** mat_sparse_mult_transposed(sparse_elem_t** A, sparse_elem_t** B, int n)
 					}
 				}
 			}
-			C[i][j] = sum;
+			if ( sum > 0 ) {
+			    sparse_elem_t* n = (sparse_elem_t*)malloc(sizeof(sparse_elem_t));
+                n->ind = j;
+				n->val = sum;
+				pcj->nxt = n;
+				pcj = n;
+			}
 		}
+		pcj->nxt = NULL;
 	}
 	return C;
 }
 
 
-elem_t** mat_sparse_mult(sparse_elem_t** A, sparse_elem_t** B, int n)
+sparse_elem_t** mat_sparse_mult(sparse_elem_t** A, sparse_elem_t** B, int n)
 {
 	sparse_elem_t** Bt = mat_sparse_transpose(B,n);
-	elem_t** C = mat_sparse_mult_transposed(A, Bt, n);
+	sparse_elem_t** C = mat_sparse_mult_transposed(A, Bt, n);
 	mat_sparse_destroy(Bt,n);
 	return C;
 }
@@ -296,19 +304,51 @@ int _test_multiply_sparse_dense_same_result()
 	mat_sparse_init_rand_boolean(_s1,_n,0.5);
 	sparse_elem_t** _s2 = mat_sparse_new(_n);
 	mat_sparse_init_rand_boolean(_s2,_n, 0.5);
-	elem_t** _s3 = mat_sparse_mult(_s1,_s2,_n);
+	sparse_elem_t** _s3 = mat_sparse_mult(_s1,_s2,_n);
 	elem_t** _d1 = mat_sparse_to_dense(_s1,_n);
 	elem_t** _d2 = mat_sparse_to_dense(_s2,_n);
 	elem_t** _d3 = mat_mult(_d1,_d2,_n);
-	res = mat_equals(_s3,_d3,_n);
+	elem_t** _d4 = mat_sparse_to_dense(_s3,_n);
+	res = mat_equals(_d3,_d4,_n);
 	mat_sparse_destroy(_s1,_n);
 	mat_sparse_destroy(_s2,_n);
-	mat_destroy(_s3,_n);
+	mat_sparse_destroy(_s3,_n);
 	mat_destroy(_d1,_n);
 	mat_destroy(_d2,_n);
 	mat_destroy(_d3,_n);
+	mat_destroy(_d4,_n);
 	return res;
 }
+
+static int _timeval_subtract(struct timeval *result, struct timeval *x, struct timeval *y)
+{
+    /* Perform the carry for the later subtraction by updating y. */
+    if (x->tv_usec < y->tv_usec) {
+        int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+        y->tv_usec -= 1000000 * nsec;
+        y->tv_sec += nsec;
+    }
+    if (x->tv_usec - y->tv_usec > 1000000) {
+        int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+        y->tv_usec += 1000000 * nsec;
+        y->tv_sec -= nsec;
+    }
+    /* Compute the time rmaining to wait. */
+    result->tv_sec = x->tv_sec - y->tv_sec;
+    result->tv_usec = x->tv_usec - y->tv_usec;
+    /* Return 1 if result is negative. */
+    assert(x->tv_usec - y->tv_usec >= 0);
+    return x->tv_sec < y->tv_sec;
+}
+
+static int tv_subtract(struct timeval *result, const struct timeval *a, const struct timeval *b)
+{
+    struct timeval xl, yl;
+    xl = *a; 
+    yl = *b;
+    return _timeval_subtract(result, &xl, &yl);
+}
+
 
 int main(int argc, char** argv) 
 {
@@ -321,6 +361,11 @@ int main(int argc, char** argv)
 	char* repr = argv[1];
 	int N = atoi(argv[2]);
 	assert(N > 0);
+    struct timeval start, end, res;
+    memset(&start, 0, sizeof(struct timeval));
+    memset(&end, 0, sizeof(struct timeval));
+    memset(&res, 0, sizeof(struct timeval));
+    gettimeofday(&start, NULL);
 	if (strcmp(repr, "dense") == 0) {
 		printf("Initializing 2 random dense matrices of size %d x %d\n", N, N);
 		elem_t** A = mat_new(N);
@@ -336,7 +381,7 @@ int main(int argc, char** argv)
 		mat_destroy(C,N);
 	} else if (strcmp(repr, "sparse") == 0) {
 
-		const double p = 0.01;
+		const double p = 0.001;
 		printf("Initializing 2 random sparse matrices (P(A[i][j] != 0) = %g)of size %d x %d\n", p, N, N);
 		sparse_elem_t** A = mat_sparse_new(N);
 		mat_sparse_init_rand_boolean(A,N,p);
@@ -344,15 +389,21 @@ int main(int argc, char** argv)
 		sparse_elem_t** B = mat_sparse_new(N);
 		mat_sparse_init_rand_boolean(B,N,p);
 		mat_sparse_print("B", B, N);
-		elem_t** C = mat_sparse_mult(A,B,N);
-		mat_print("A x B", C, N);
+		sparse_elem_t** C = mat_sparse_mult(A,B,N);
+		mat_sparse_print("A x B", C, N);
 		mat_sparse_destroy(A,N);
 		mat_sparse_destroy(B,N);
-		mat_destroy(C,N);
+		mat_sparse_destroy(C,N);
 
 	} else {
 		printf("usage: matmulttest [dense|sparse] [N]\n");
 		return 1;
 	}
+    int r, tmsec;
+    gettimeofday(&end,NULL);
+    r = tv_subtract(&res, &end, &start);
+    assert(r == 0);
+    tmsec = res.tv_sec * 1000 + res.tv_usec / 1000;
+    printf("%d\n", tmsec);
 	return 0;
 }
